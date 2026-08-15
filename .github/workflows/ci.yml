@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - boilerplate
+      - dev
+      - idiomatic
+      - master
+      - rc1
+      - rc2
+      - rc3
+  pull_request:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checking out code
+      uses: actions/checkout@v4
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Publish dry-run
+      run: cargo publish --dry-run
