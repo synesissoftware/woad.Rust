@@ -44,7 +44,15 @@ woad = { version = "0" }
 
 ## Components
 
-**woad.Rust** currently ships version metadata (`woad::VERSION`). Colour codes, TTY/stream gating, and Windows virtual-terminal opt-in are not implemented in this 0.0.0 skeleton.
+**woad.Rust** ships SGR string constants (`RESET`, `FG_*`, `BG_*`, including bright variants) and `VERSION`. TTY/stream gating and Windows virtual-terminal opt-in are not implemented yet.
+
+```rust
+use woad::{FG_GREEN, RESET};
+
+fn main() {
+    println!("{FG_GREEN}ok{RESET}");
+}
+```
 
 
 ## Project Information
