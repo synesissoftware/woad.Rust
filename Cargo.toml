@@ -1,0 +1,61 @@
+# ##########################################################
+# Package
+
+[package]
+
+authors = [
+	"Matt Wilson <matthew@synesis.com.au>",
+]
+categories = [
+	"command-line-interface",
+]
+description = "Minimal ANSI terminal colour codes, for Rust"
+edition = "2021"
+homepage = "https://github.com/synesissoftware/woad.Rust"
+keywords = [
+	"ansi",
+	"colour",
+	"sgr",
+	"terminal",
+	"tty",
+]
+license = "BSD-3-Clause"
+name = "woad"
+readme = "README.md"
+repository = "https://github.com/synesissoftware/woad.Rust"
+version = "0.0.0"
+
+
+# ##########################################################
+# Targets
+
+[lib]
+name = "woad"
+path = "src/lib.rs"
+
+
+# ##########################################################
+# Features
+
+[features]
+
+default = [
+]
+
+# General features:
+#
+# - "null-feature" - a feature that has no effect (and, thus, is useful for simplifying driver scripts);
+
+null-feature = []
+
+
+# ##########################################################
+# Dependencies
+
+[dependencies]
+
+
+[dev-dependencies]
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
