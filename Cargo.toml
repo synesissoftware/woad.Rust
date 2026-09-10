@@ -1,3 +1,4 @@
+
 # ##########################################################
 # Package
 
@@ -9,8 +10,18 @@ authors = [
 categories = [
 	"command-line-interface",
 ]
-description = "Minimal ANSI terminal colour codes, for Rust"
+description = "Minimal ANSI terminal colour codes (for Rust)"
+documentation = "https://docs.rs/woad"
 edition = "2021"
+exclude = [
+	".cargo",
+	".cursor",
+	".github",
+	".vimrc",
+	".vscode",
+	"scripts",
+	"target",
+]
 homepage = "https://github.com/synesissoftware/woad.Rust"
 keywords = [
 	"ansi",
@@ -23,6 +34,7 @@ license = "BSD-3-Clause"
 name = "woad"
 readme = "README.md"
 repository = "https://github.com/synesissoftware/woad.Rust"
+rust-version = "1.74"
 version = "0.0.1"
 
 
@@ -42,18 +54,26 @@ path = "src/lib.rs"
 default = [
 ]
 
+
 # General features:
 #
+# - "_NEVER_TO_BE_ENABLED" - this is a placeholder feature and must NEVER be specified;
 # - "null-feature" - a feature that has no effect (and, thus, is useful for simplifying driver scripts);
 
+_NEVER_TO_BE_ENABLED = []
 null-feature = []
+
+
+# Crate-specific features:
+#
 
 
 # ##########################################################
 # Dependencies
 
-[dependencies]
+[build-dependencies]
 
+[dependencies]
 
 [dev-dependencies]
 
