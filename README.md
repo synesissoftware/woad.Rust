@@ -18,6 +18,7 @@ Minimal ANSI terminal colour codes, for Rust
 - [Project Information](#project-information)
   - [Where to get help](#where-to-get-help)
   - [Contribution guidelines](#contribution-guidelines)
+  - [Minimum Supported Rust Version (MSRV)](#minimum-supported-rust-version-msrv)
   - [Dependencies](#dependencies)
     - [Efferent (fan-out)](#efferent-fan-out)
     - [Development Dependencies](#development-dependencies)
@@ -66,6 +67,15 @@ fn main() {
 ### Contribution guidelines
 
 Defect reports, feature requests, and pull requests are welcome on https://github.com/synesissoftware/woad.Rust.
+
+
+### Minimum Supported Rust Version (MSRV)
+
+The declared Minimum Supported Rust Version (MSRV) for **woad.Rust** is **1.74**.
+
+This MSRV guarantee applies to the library crate itself, its runtime dependencies (`[dependencies]`), and its build dependencies (`[build-dependencies]`). Downstream consumers compiling this crate as a dependency are guaranteed that it builds cleanly on the declared MSRV toolchain.
+
+Development dependencies (`[dev-dependencies]`, such as benchmarking frameworks like **criterion**) may require newer Rust toolchains for local development or performance testing. These dev-dependencies are never fetched or compiled by downstream consumers and do not affect the library's MSRV guarantee.
 
 
 ### Dependencies
