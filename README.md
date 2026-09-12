@@ -18,6 +18,7 @@ Minimal ANSI terminal colour codes, for Rust
 - [Project Information](#project-information)
   - [Where to get help](#where-to-get-help)
   - [Contribution guidelines](#contribution-guidelines)
+  - [Minimum Supported Rust Version (MSRV)](#minimum-supported-rust-version-msrv)
   - [Dependencies](#dependencies)
     - [Efferent (fan-out)](#efferent-fan-out)
     - [Development Dependencies](#development-dependencies)
@@ -44,7 +45,15 @@ woad = { version = "0" }
 
 ## Components
 
-**woad.Rust** currently ships version metadata (`woad::VERSION`). Colour codes, TTY/stream gating, and Windows virtual-terminal opt-in are not implemented in this 0.0.0 skeleton.
+**woad.Rust** ships SGR string constants (`RESET`, `FG_*`, `BG_*`, including bright variants) and `VERSION`. TTY/stream gating and Windows virtual-terminal opt-in are not implemented yet.
+
+```rust
+use woad::{FG_GREEN, RESET};
+
+fn main() {
+    println!("{FG_GREEN}ok{RESET}");
+}
+```
 
 
 ## Project Information
@@ -58,6 +67,15 @@ woad = { version = "0" }
 ### Contribution guidelines
 
 Defect reports, feature requests, and pull requests are welcome on https://github.com/synesissoftware/woad.Rust.
+
+
+### Minimum Supported Rust Version (MSRV)
+
+The declared Minimum Supported Rust Version (MSRV) for **woad.Rust** is **1.74**.
+
+This MSRV guarantee applies to the library crate itself, its runtime dependencies (`[dependencies]`), and its build dependencies (`[build-dependencies]`). Downstream consumers compiling this crate as a dependency are guaranteed that it builds cleanly on the declared MSRV toolchain.
+
+Development dependencies (`[dev-dependencies]`, such as benchmarking frameworks like **criterion**) may require newer Rust toolchains for local development or performance testing. These dev-dependencies are never fetched or compiled by downstream consumers and do not affect the library's MSRV guarantee.
 
 
 ### Dependencies
@@ -80,6 +98,7 @@ None (currently).
 
 ### Related projects
 
+* [**woad**](https://github.com/synesissoftware/woad/)
 * [**woad.Python**](https://github.com/synesissoftware/woad.Python/)
 * [**woad.Ruby**](https://github.com/synesissoftware/woad.Ruby/)
 
