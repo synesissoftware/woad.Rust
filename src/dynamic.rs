@@ -14,9 +14,9 @@ use std::{
 use std::os::fd::AsFd;
 
 
-// The truey/falsey token sets come from 2be
-// (https://github.com/synesissoftware/2be). Classification is local so
-// this crate stays dependency-free. woad adds `always` / `force` and
+// The truey/falsey token sets come from to-be.Rust
+// (https://github.com/synesissoftware/to-be.Rust). Classification is local
+// so this crate stays dependency-free. woad adds `always` / `force` and
 // `never` / `none`, compares case-insensitively, and does not trim.
 
 
