@@ -10,7 +10,7 @@ authors = [
 categories = [
 	"command-line-interface",
 ]
-description = "Minimal ANSI terminal colour codes (for Rust)"
+description = "Minimal ANSI terminal colour codes, with stream-conditional emission (for Rust)"
 documentation = "https://docs.rs/woad"
 edition = "2021"
 exclude = [
@@ -26,6 +26,7 @@ homepage = "https://github.com/synesissoftware/woad.Rust"
 keywords = [
 	"ansi",
 	"colour",
+	"no-color",
 	"sgr",
 	"terminal",
 	"tty",
@@ -35,7 +36,7 @@ name = "woad"
 readme = "README.md"
 repository = "https://github.com/synesissoftware/woad.Rust"
 rust-version = "1.74"
-version = "0.0.1"
+version = "0.1.0-alpha1"
 
 
 # ##########################################################
@@ -44,6 +45,10 @@ version = "0.0.1"
 [lib]
 name = "woad"
 path = "src/lib.rs"
+
+[[example]]
+name = "colour_for"
+path = "examples/colour_for/main.rs"
 
 [[example]]
 name = "versions"
