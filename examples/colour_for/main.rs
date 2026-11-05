@@ -5,9 +5,12 @@
 //   WOAD_COLOUR=always cargo run --example colour_for | cat
 //   WOAD_COLOUR=never cargo run --example colour_for
 
+use std::io as std_io;
+
+
 fn main() {
-    let stdout = std::io::stdout();
-    let stderr = std::io::stderr();
+    let stdout = std_io::stdout();
+    let stderr = std_io::stderr();
 
     println!(
         "policy: {}; stdout is{} a tty; stderr is{} a tty",
@@ -50,6 +53,7 @@ fn main() {
     #[cfg(unix)]
     {
         use std::os::fd::AsFd as _;
+
 
         println!(
             "{}this line is cyan if, and only if, stdout's descriptor warrants colour{}",

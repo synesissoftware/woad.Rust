@@ -1,5 +1,8 @@
+use std::io as std_io;
+
+
 fn main() {
-    let stdout = std::io::stdout();
+    let stdout = std_io::stdout();
 
     println!(
         "{}v{}{} ({:#010x})",

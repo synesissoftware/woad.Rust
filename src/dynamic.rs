@@ -5,13 +5,15 @@
 //! crate root. Windows console handles and virtual-terminal opt-in are
 //! not implemented; see [`console_supports_ansi`].
 
-use std::{
-    io::IsTerminal,
-    sync::Mutex,
-};
-
 #[cfg(unix)]
 use std::os::fd::AsFd;
+use std::{
+    env as std_env,
+    fmt as std_fmt,
+    io::IsTerminal,
+    sync as std_sync,
+    sync::Mutex,
+};
 
 
 // The truey/falsey token sets come from to-be.Rust
@@ -51,11 +53,11 @@ impl ColourPolicy {
     }
 }
 
-impl std::fmt::Display for ColourPolicy {
+impl std_fmt::Display for ColourPolicy {
     fn fmt(
         &self,
-        f : &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+        f : &mut std_fmt::Formatter<'_>,
+    ) -> std_fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -75,6 +77,7 @@ mod test_env {
         collections::BTreeMap,
     };
 
+
     // `const { }` in `thread_local!` needs Rust 1.79; the crate MSRV is
     // 1.74, and this overlay exists only for tests.
     thread_local! {
@@ -89,7 +92,7 @@ mod test_env {
 }
 
 
-fn lock_cache() -> std::sync::MutexGuard<'static, Option<Cached>> {
+fn lock_cache() -> std_sync::MutexGuard<'static, Option<Cached>> {
     CACHE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
@@ -107,7 +110,7 @@ fn getenv_nonempty(name : &str) -> Option<String> {
         }
     }
 
-    std::env::var(name).ok().filter(|value| !value.is_empty())
+    std_env::var(name).ok().filter(|value| !value.is_empty())
 }
 
 fn is_truey(value : &str) -> bool {
@@ -382,7 +385,13 @@ pub fn blinking_for(target : &impl IsTerminal) -> &'static str {
 mod tests {
     #![allow(non_snake_case)]
 
-    use std::io::IsTerminal;
+    use std::{
+        fs as std_fs,
+        io as std_io,
+        io::IsTerminal,
+        path as std_path,
+        process as std_process,
+    };
 
     use super::{
         colour_is_warranted,
@@ -405,6 +414,7 @@ mod tests {
         FG_RED,
         RESET,
     };
+
 
     struct ClearOverlay;
 
@@ -435,22 +445,24 @@ mod tests {
     }
 
     struct TempNotATty {
-        file : Option<std::fs::File>,
-        path : std::path::PathBuf,
+        file : Option<std_fs::File>,
+        path : std_path::PathBuf,
     }
 
     impl TempNotATty {
         fn create() -> Self {
-            use std::sync::atomic::{
-                AtomicU64,
-                Ordering,
+            use std::{
+                env as std_env,
+                sync::atomic::{
+                    AtomicU64,
+                    Ordering,
+                },
             };
-
             static N : AtomicU64 = AtomicU64::new(0);
 
             let id = N.fetch_add(1, Ordering::Relaxed);
-            let path = std::env::temp_dir().join(format!("woad-rust-{}-{}", std::process::id(), id,));
-            let file = std::fs::File::create(&path).unwrap();
+            let path = std_env::temp_dir().join(format!("woad-rust-{}-{}", std_process::id(), id,));
+            let file = std_fs::File::create(&path).unwrap();
 
             Self {
                 file : Some(file),
@@ -458,7 +470,7 @@ mod tests {
             }
         }
 
-        fn file(&self) -> &std::fs::File {
+        fn file(&self) -> &std_fs::File {
             self.file.as_ref().unwrap()
         }
     }
@@ -466,7 +478,7 @@ mod tests {
     impl Drop for TempNotATty {
         fn drop(&mut self) {
             self.file.take();
-            let _ = std::fs::remove_file(&self.path);
+            let _ = std_fs::remove_file(&self.path);
         }
     }
 
@@ -645,9 +657,9 @@ mod tests {
 
     #[test]
     fn TEST_STREAM_IS_TTY_AGREES_WITH_IsTerminal() {
-        let stdout = std::io::stdout();
-        let stderr = std::io::stderr();
-        let stdin = std::io::stdin();
+        let stdout = std_io::stdout();
+        let stderr = std_io::stderr();
+        let stdin = std_io::stdin();
 
         assert_eq!(stdout.is_terminal(), stream_is_tty(&stdout));
         assert_eq!(stderr.is_terminal(), stream_is_tty(&stderr));
