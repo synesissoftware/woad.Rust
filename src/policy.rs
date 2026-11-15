@@ -393,9 +393,18 @@ mod tests {
 
     use std::{
         ffi as std_ffi,
-        fs::File,
+        fs::{
+            File,
+            OpenOptions,
+        },
         io as std_io,
-        os::fd::FromRawFd,
+        os::{
+            fd::FromRawFd,
+            unix::{
+                ffi::OsStrExt,
+                fs::OpenOptionsExt,
+            },
+        },
         sync::OnceLock,
     };
 
@@ -524,10 +533,6 @@ mod tests {
         extern "C" {
             fn close(fd : i32) -> i32;
             fn grantpt(fd : i32) -> i32;
-            fn open(
-                path : *const std_ffi::c_char,
-                flags : i32,
-            ) -> i32;
             fn posix_openpt(flags : i32) -> i32;
             fn ptsname(fd : i32) -> *mut std_ffi::c_char;
             fn unlockpt(fd : i32) -> i32;
@@ -546,14 +551,21 @@ mod tests {
             let name = ptsname(master);
             assert!(!name.is_null(), "ptsname");
 
-            let slave = open(name, O_RDWR | O_NOCTTY);
-            if slave < 0 {
-                let err = std_io::Error::last_os_error();
-                close(master);
-                panic!("open slave: {err}");
-            }
+            let path = std_ffi::OsStr::from_bytes(std_ffi::CStr::from_ptr(name).to_bytes());
+            let slave = match OpenOptions::new()
+                .read(true)
+                .write(true)
+                .custom_flags(O_NOCTTY)
+                .open(path)
+            {
+                Ok(file) => file,
+                Err(err) => {
+                    close(master);
+                    panic!("open slave: {err}");
+                },
+            };
 
-            (File::from_raw_fd(slave), File::from_raw_fd(master))
+            (slave, File::from_raw_fd(master))
         }
     }
 
