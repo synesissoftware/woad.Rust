@@ -4,7 +4,10 @@
 //! colour contract. Windows virtual-terminal gating is not in this alpha.
 
 use std::{
-    cell::Cell,
+    cell::{
+        self as std_cell,
+        Cell,
+    },
     env,
     ffi::{
         OsStr,
@@ -18,96 +21,120 @@ use std::{
 };
 
 
-/// Colour depends on the writer. `TERM=dumb` suppresses colour on this
-/// path only.
-pub const COLOUR_POLICY_AUTO : i32 = 0;
+/* /////////////////////////////////////////////////////////////////////////
+ * enumerations
+ */
 
-/// Colour for every writer, including a non-terminal and `TERM=dumb`.
-pub const COLOUR_POLICY_FORCE : i32 = 1;
+/// Prevailing colour policy. Discriminants are the **woad** 0.3.0 values.
+#[derive(Clone)]
+#[derive(Copy)]
+#[derive(Debug)]
+#[derive(Eq, PartialEq)]
+#[repr(i32)]
+pub enum ColourPolicy {
+    /// Colour depends on the writer. `TERM=dumb` suppresses colour on this
+    /// path only.
+    Auto = 0,
 
-/// Colour for no writer, including a terminal.
-pub const COLOUR_POLICY_INHIBIT : i32 = 2;
+    /// Colour for every writer, including a non-terminal and `TERM=dumb`.
+    Force = 1,
 
+    /// Colour for no writer, including a terminal.
+    Inhibit = 2,
+}
+
+
+/* /////////////////////////////////////////////////////////////////////////
+ * constants
+ */
 
 const TRUEY : &[&str] = &["1", "always", "force", "on", "true", "yes"];
 
 const FALSEY : &[&str] = &["0", "false", "never", "no", "none", "off"];
 
+
+/* /////////////////////////////////////////////////////////////////////////
+ * types and globals
+ */
+
 struct Environment {
     determined :   bool,
-    policy :       i32,
+    policy :       ColourPolicy,
     term_is_dumb : bool,
 }
 
-
-/// Environment cache. Touched only while [`GATE`] is held by this thread.
-struct Cache(std::cell::UnsafeCell<Environment>);
+/// Environment cache. Touched only while [`CACHE_GATE`] is held by the
+/// thread.
+struct Cache(std_cell::UnsafeCell<Environment>);
 
 // SAFETY: every access goes through `with_environment`, which holds
-// `GATE`. Re-entry is same-thread only, so the mutable borrow does not
+// `CACHE_GATE`. Re-entry is same-thread only, so the mutable borrow does not
 // alias another thread.
 unsafe impl Sync for Cache {
 }
 
 
-static CACHE : Cache = Cache(std::cell::UnsafeCell::new(Environment {
+/* /////////////////////////////////////////////////////////
+ * globals
+ */
+
+/// Process-wide colour-policy cache.
+///
+/// `determined` starts `false`. The policy and the `TERM=dumb` flag are
+/// placeholders until `ensure` fills them. `refresh` sets `determined`
+/// back to `false` and does not itself re-read.
+///
+/// The value sits in an `UnsafeCell` so `with_environment` can borrow it
+/// mutably while `CACHE_GATE` is held, including when this thread
+/// re-enters. Every access goes through that function.
+static CACHE : Cache = Cache(std_cell::UnsafeCell::new(Environment {
     determined :   false,
-    policy :       COLOUR_POLICY_AUTO,
+    policy :       ColourPolicy::Auto,
     term_is_dumb : false,
 }));
 
-static GATE : Mutex<()> = Mutex::new(());
+
+/// Mutex that gives one thread at a time exclusive access to `CACHE`.
+///
+/// The mutex carries no data. The cache lives in `CACHE`, and every access
+/// goes through `with_environment` while this lock is held.
+///
+/// `CACHE_HELD` is not what this guards. It is a thread-local flag so the
+/// thread that already holds this lock can re-enter without locking again.
+/// Other threads wait here.
+static CACHE_GATE : Mutex<()> = Mutex::new(());
+
 
 thread_local! {
-    static DEPTH : Cell<u32> = const { Cell::new(0) };
+    /// Thread-local flag: whether this thread already holds `CACHE_GATE`.
+    ///
+    /// `false` means it does not, so `with_environment` locks `CACHE_GATE`
+    /// and then stores `true`. `true` means it does, so a nested call uses
+    /// `CACHE` without locking again.
+    ///
+    /// `LocalKey::get` and `LocalKey::set` are implemented for `Cell<T>`.
+    /// A plain `bool` has neither, so the flag is a `Cell<bool>`.
+    static CACHE_HELD : Cell<bool> = const { Cell::new(false) };
 }
 
 
-struct DepthReset;
+/* /////////////////////////////////////////////////////////////////////////
+ * helper functions
+ */
 
-impl Drop for DepthReset {
-    fn drop(&mut self) {
-        DEPTH.with(|depth| {
-            depth.set(0);
-        });
+/// Fills `env` from the process environment when not yet determined.
+fn ensure(env : &mut Environment) {
+    if !env.determined {
+        env.policy = policy_from_environment();
+        env.term_is_dumb = term_is_dumb_from_environment();
+        env.determined = true;
     }
 }
 
 
-fn lock_gate() -> MutexGuard<'static, ()> {
-    GATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-
-fn with_environment<R>(body : impl FnOnce(&mut Environment) -> R) -> R {
-    DEPTH.with(|depth| {
-        if depth.get() > 0 {
-            // SAFETY: this thread already holds `GATE` (see `Cache`).
-            body(unsafe { &mut *CACHE.0.get() })
-        } else {
-            let _gate = lock_gate();
-            depth.set(1);
-            let _reset = DepthReset;
-            // SAFETY: `GATE` is held, and `DEPTH` blocks other entries on
-            // this thread from taking a second guard. Other threads wait
-            // on `GATE`.
-            body(unsafe { &mut *CACHE.0.get() })
-        }
-    })
-}
-
-
-fn nonempty(name : &str) -> Option<OsString> {
-    let value = env::var_os(name)?;
-
-    if value.is_empty() {
-        None
-    } else {
-        Some(value)
-    }
-}
-
-
+/// Whether `value` equals `candidate`, ignoring ASCII case.
+///
+/// A non-Unicode `OsStr` does not match.
 fn eq_ignore_ascii(
     value : &OsStr,
     candidate : &str,
@@ -119,6 +146,7 @@ fn eq_ignore_ascii(
 }
 
 
+/// Whether `value` equals any entry in `candidates`, ignoring ASCII case.
 fn is_listed(
     value : &OsStr,
     candidates : &[&str],
@@ -127,47 +155,86 @@ fn is_listed(
 }
 
 
-fn policy_from_environment() -> i32 {
-    let own = nonempty("WOAD_COLOUR").or_else(|| nonempty("WOAD_COLOR"));
+/// Locks `CACHE_GATE` and recovers a poisoned lock.
+fn lock_gate() -> MutexGuard<'static, ()> {
+    CACHE_GATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
-    if let Some(value) = own {
+
+/// Value of `name` when the variable is set and not empty.
+fn nonempty(name : &str) -> Option<OsString> {
+    let value = env::var_os(name)?;
+
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+
+/// Colour policy from the current environment, ignoring the cache.
+fn policy_from_environment() -> ColourPolicy {
+    if let Some(value) = nonempty("WOAD_COLOUR").or_else(|| nonempty("WOAD_COLOR")) {
         if is_listed(&value, TRUEY) {
-            return COLOUR_POLICY_FORCE;
+            return ColourPolicy::Force;
         }
 
         if is_listed(&value, FALSEY) {
-            return COLOUR_POLICY_INHIBIT;
+            return ColourPolicy::Inhibit;
         }
 
-        return COLOUR_POLICY_AUTO;
+        return ColourPolicy::Auto;
     }
 
     if nonempty("NO_COLOR").is_some() {
-        return COLOUR_POLICY_INHIBIT;
+        return ColourPolicy::Inhibit;
     }
 
     if let Some(value) = nonempty("CLICOLOR_FORCE") {
         if value != OsStr::new("0") {
-            return COLOUR_POLICY_FORCE;
+            return ColourPolicy::Force;
         }
     }
 
     if let Some(value) = nonempty("FORCE_COLOR") {
         if value != OsStr::new("0") && !eq_ignore_ascii(&value, "false") {
-            return COLOUR_POLICY_FORCE;
+            return ColourPolicy::Force;
         }
     }
 
     if let Some(value) = nonempty("CLICOLOR") {
         if value == OsStr::new("0") {
-            return COLOUR_POLICY_INHIBIT;
+            return ColourPolicy::Inhibit;
         }
     }
 
-    COLOUR_POLICY_AUTO
+    ColourPolicy::Auto
 }
 
 
+/// Whether colour should be emitted.
+///
+/// [`ColourPolicy::Force`] is always yes. [`ColourPolicy::Inhibit`] is
+/// always no. [`ColourPolicy::Auto`] is yes only when `is_terminal` is
+/// true and `TERM` is not `dumb`. Calls `ensure` first.
+fn supports_for(
+    env : &mut Environment,
+    is_terminal : bool,
+) -> bool {
+    ensure(env);
+
+    match env.policy {
+        ColourPolicy::Auto => is_terminal && !env.term_is_dumb,
+        ColourPolicy::Force => true,
+        ColourPolicy::Inhibit => false,
+    }
+}
+
+
+/// Whether `TERM` equals `dumb`, ignoring ASCII case.
+///
+/// An absent or empty `TERM` is not dumb.
 fn term_is_dumb_from_environment() -> bool {
     match nonempty("TERM") {
         Some(value) => eq_ignore_ascii(&value, "dumb"),
@@ -176,33 +243,64 @@ fn term_is_dumb_from_environment() -> bool {
 }
 
 
-fn ensure(environment : &mut Environment) {
-    if !environment.determined {
-        environment.policy = policy_from_environment();
-        environment.term_is_dumb = term_is_dumb_from_environment();
-        environment.determined = true;
+/// Runs `body` with exclusive access to the process-wide environment cache.
+///
+/// `CACHE_GATE` is a `Mutex`. The same thread cannot lock it twice, and the
+/// public queries call this function while a caller may already be inside
+/// it. `CACHE_HELD` records that for this thread only:
+///
+/// * `false` means this thread does not hold `CACHE_GATE`. The call locks
+///   `CACHE_GATE`, sets `CACHE_HELD` to `true`, and runs `body`;
+/// * `true` means this thread already holds `CACHE_GATE`. The call runs
+///   `body` without locking again;
+///
+/// `ClearCacheHeld` sets `CACHE_HELD` back to `false` when the outer call
+/// returns, including after a panic, and it does so before the mutex guard
+/// drops.
+/// Other threads never read `CACHE_HELD`. They wait on `CACHE_GATE`.
+///
+/// This is one lock for the outer call, not a recursive mutex. Nested
+/// calls do not lock `CACHE_GATE` again and do not count entries. A
+/// direct lock of `CACHE_GATE` on this thread still waits.
+fn with_environment<R>(body : impl FnOnce(&mut Environment) -> R) -> R {
+    struct ClearCacheHeld;
+
+    impl Drop for ClearCacheHeld {
+        fn drop(&mut self) {
+            CACHE_HELD.set(false);
+        }
+    }
+
+    if CACHE_HELD.get() {
+        // SAFETY: this thread already holds `CACHE_GATE` (see `Cache`).
+        //
+        // Now we may invoke safely the `body` function.
+        body(unsafe { &mut *CACHE.0.get() })
+    } else {
+        let _guard = lock_gate();
+
+        CACHE_HELD.set(true);
+
+        let _reset = ClearCacheHeld;
+
+        // SAFETY: `CACHE_GATE` is held, and `CACHE_HELD` blocks other entries on
+        // this thread from taking a second guard. Other threads wait
+        // on `CACHE_GATE`.
+        //
+        // Now we may invoke safely the `body` function.
+        body(unsafe { &mut *CACHE.0.get() })
     }
 }
 
 
-fn supports_for(
-    environment : &mut Environment,
-    is_terminal : bool,
-) -> bool {
-    ensure(environment);
-
-    match environment.policy {
-        COLOUR_POLICY_FORCE => true,
-        COLOUR_POLICY_INHIBIT => false,
-        _ => is_terminal && !environment.term_is_dumb,
-    }
-}
-
+/* /////////////////////////////////////////////////////////////////////////
+ * API functions
+ */
 
 /// Prevailing colour policy, cached until [`refresh`].
 ///
-/// Returns [`COLOUR_POLICY_AUTO`] (0), [`COLOUR_POLICY_FORCE`] (1), or
-/// [`COLOUR_POLICY_INHIBIT`] (2). An unset or empty variable is absent.
+/// Returns [`ColourPolicy::Auto`] (0), [`ColourPolicy::Force`] (1), or
+/// [`ColourPolicy::Inhibit`] (2). An unset or empty variable is absent.
 /// Values are not trimmed.
 ///
 /// Precedence:
@@ -221,22 +319,11 @@ fn supports_for(
 /// `false`, `never`, `no`, `none`, `off`. Both lists are
 /// case-insensitive. `CLICOLOR` and `CLICOLOR_FORCE` compare `0`
 /// case-sensitively.
-pub fn colour_policy() -> i32 {
-    with_environment(|environment| {
-        ensure(environment);
-        environment.policy
+pub fn colour_policy() -> ColourPolicy {
+    with_environment(|env| {
+        ensure(env);
+        env.policy
     })
-}
-
-
-/// Drops the cached policy and the cached `TERM=dumb` flag.
-///
-/// The next query reads the environment again. On Unix there is no
-/// console cache to drop.
-pub fn refresh() {
-    with_environment(|environment| {
-        environment.determined = false;
-    });
 }
 
 
@@ -251,23 +338,14 @@ where
 }
 
 
-/// Whether colour should be emitted for `writer`.
+/// Drops the cached policy and the cached `TERM=dumb` flag.
 ///
-/// [`COLOUR_POLICY_FORCE`] is yes for every writer.
-/// [`COLOUR_POLICY_INHIBIT`] is no for every writer.
-/// [`COLOUR_POLICY_AUTO`] is yes only when `writer` is a terminal and
-/// `TERM` is not `dumb` (any capitalisation).
-///
-/// On Unix a terminal is ANSI-capable. Windows virtual-terminal gating and
-/// mintty recognition are not implemented in this alpha; a Windows terminal
-/// is treated with the Unix rule.
-pub fn supports_colour<W>(writer : &W) -> bool
-where
-    W : IsTerminal + ?Sized,
-{
-    let is_terminal = writer.is_terminal();
-
-    with_environment(|environment| supports_for(environment, is_terminal))
+/// The next query reads the environment again. On Unix there is no
+/// console cache to drop.
+pub fn refresh() {
+    with_environment(|env| {
+        env.determined = false;
+    });
 }
 
 
@@ -289,12 +367,34 @@ where
 }
 
 
+/// Whether colour should be emitted for `writer`.
+///
+/// [`ColourPolicy::Force`] is yes for every writer.
+/// [`ColourPolicy::Inhibit`] is no for every writer.
+/// [`ColourPolicy::Auto`] is yes only when `writer` is a terminal and
+/// `TERM` is not `dumb` (any capitalisation).
+///
+/// On Unix a terminal is ANSI-capable. Windows virtual-terminal gating and
+/// mintty recognition are not implemented in this alpha; a Windows terminal
+/// is treated with the Unix rule.
+pub fn supports_colour<W>(writer : &W) -> bool
+where
+    W : IsTerminal + ?Sized,
+{
+    let is_terminal = writer.is_terminal();
+
+    with_environment(|env| supports_for(env, is_terminal))
+}
+
+
 #[cfg(all(test, unix))]
 mod tests {
     #![allow(non_snake_case)]
 
     use std::{
+        ffi as std_ffi,
         fs::File,
+        io as std_io,
         os::fd::FromRawFd,
         sync::OnceLock,
     };
@@ -425,20 +525,20 @@ mod tests {
             fn close(fd : i32) -> i32;
             fn grantpt(fd : i32) -> i32;
             fn open(
-                path : *const std::ffi::c_char,
+                path : *const std_ffi::c_char,
                 flags : i32,
             ) -> i32;
             fn posix_openpt(flags : i32) -> i32;
-            fn ptsname(fd : i32) -> *mut std::ffi::c_char;
+            fn ptsname(fd : i32) -> *mut std_ffi::c_char;
             fn unlockpt(fd : i32) -> i32;
         }
 
         unsafe {
             let master = posix_openpt(O_RDWR | O_NOCTTY);
-            assert!(master >= 0, "posix_openpt: {}", std::io::Error::last_os_error());
+            assert!(master >= 0, "posix_openpt: {}", std_io::Error::last_os_error());
 
             if grantpt(master) != 0 || unlockpt(master) != 0 {
-                let err = std::io::Error::last_os_error();
+                let err = std_io::Error::last_os_error();
                 close(master);
                 panic!("grantpt/unlockpt: {err}");
             }
@@ -448,7 +548,7 @@ mod tests {
 
             let slave = open(name, O_RDWR | O_NOCTTY);
             if slave < 0 {
-                let err = std::io::Error::last_os_error();
+                let err = std_io::Error::last_os_error();
                 close(master);
                 panic!("open slave: {err}");
             }
@@ -473,7 +573,7 @@ mod tests {
         row : u32,
         assignments : &[(&str, &str)],
         terminal : bool,
-        policy : i32,
+        policy : ColourPolicy,
         colour : bool,
     ) {
         with_managed(assignments, || {
@@ -495,52 +595,52 @@ mod tests {
 
     #[test]
     fn TEST_ROW_1_NONE_TERMINAL() {
-        assert_row(1, &[], true, COLOUR_POLICY_AUTO, true);
+        assert_row(1, &[], true, ColourPolicy::Auto, true);
     }
 
     #[test]
     fn TEST_ROW_2_NONE_DETACHED() {
-        assert_row(2, &[], false, COLOUR_POLICY_AUTO, false);
+        assert_row(2, &[], false, ColourPolicy::Auto, false);
     }
 
     #[test]
     fn TEST_ROW_3_TERM_DUMB() {
-        assert_row(3, &[("TERM", "dumb")], true, COLOUR_POLICY_AUTO, false);
+        assert_row(3, &[("TERM", "dumb")], true, ColourPolicy::Auto, false);
     }
 
     #[test]
     fn TEST_ROW_4_TERM_DUMB_UPPER() {
-        assert_row(4, &[("TERM", "DUMB")], true, COLOUR_POLICY_AUTO, false);
+        assert_row(4, &[("TERM", "DUMB")], true, ColourPolicy::Auto, false);
     }
 
     #[test]
     fn TEST_ROW_5_WOAD_COLOUR_1() {
-        assert_row(5, &[("WOAD_COLOUR", "1")], false, COLOUR_POLICY_FORCE, true);
+        assert_row(5, &[("WOAD_COLOUR", "1")], false, ColourPolicy::Force, true);
     }
 
     #[test]
     fn TEST_ROW_6_WOAD_COLOR_ALWAYS() {
-        assert_row(6, &[("WOAD_COLOR", "always")], false, COLOUR_POLICY_FORCE, true);
+        assert_row(6, &[("WOAD_COLOR", "always")], false, ColourPolicy::Force, true);
     }
 
     #[test]
     fn TEST_ROW_7_WOAD_COLOUR_NEVER() {
-        assert_row(7, &[("WOAD_COLOUR", "never")], true, COLOUR_POLICY_INHIBIT, false);
+        assert_row(7, &[("WOAD_COLOUR", "never")], true, ColourPolicy::Inhibit, false);
     }
 
     #[test]
     fn TEST_ROW_8_WOAD_COLOUR_AUTO_TERMINAL() {
-        assert_row(8, &[("WOAD_COLOUR", "auto")], true, COLOUR_POLICY_AUTO, true);
+        assert_row(8, &[("WOAD_COLOUR", "auto")], true, ColourPolicy::Auto, true);
     }
 
     #[test]
     fn TEST_ROW_9_WOAD_COLOUR_AUTO_DETACHED() {
-        assert_row(9, &[("WOAD_COLOUR", "auto")], false, COLOUR_POLICY_AUTO, false);
+        assert_row(9, &[("WOAD_COLOUR", "auto")], false, ColourPolicy::Auto, false);
     }
 
     #[test]
     fn TEST_ROW_10_WOAD_COLOUR_PURPLE() {
-        assert_row(10, &[("WOAD_COLOUR", "purple")], true, COLOUR_POLICY_AUTO, true);
+        assert_row(10, &[("WOAD_COLOUR", "purple")], true, ColourPolicy::Auto, true);
     }
 
     #[test]
@@ -549,14 +649,14 @@ mod tests {
             11,
             &[("CLICOLOR_FORCE", "1"), ("NO_COLOR", "1")],
             true,
-            COLOUR_POLICY_INHIBIT,
+            ColourPolicy::Inhibit,
             false,
         );
     }
 
     #[test]
     fn TEST_ROW_12_CLICOLOR_FORCE() {
-        assert_row(12, &[("CLICOLOR_FORCE", "1")], false, COLOUR_POLICY_FORCE, true);
+        assert_row(12, &[("CLICOLOR_FORCE", "1")], false, ColourPolicy::Force, true);
     }
 
     #[test]
@@ -565,14 +665,14 @@ mod tests {
             13,
             &[("CLICOLOR", "0"), ("CLICOLOR_FORCE", "0")],
             true,
-            COLOUR_POLICY_INHIBIT,
+            ColourPolicy::Inhibit,
             false,
         );
     }
 
     #[test]
     fn TEST_ROW_14_FORCE_COLOR() {
-        assert_row(14, &[("FORCE_COLOR", "1")], false, COLOUR_POLICY_FORCE, true);
+        assert_row(14, &[("FORCE_COLOR", "1")], false, ColourPolicy::Force, true);
     }
 
     #[test]
@@ -581,29 +681,29 @@ mod tests {
             15,
             &[("CLICOLOR", "0"), ("FORCE_COLOR", "false")],
             true,
-            COLOUR_POLICY_INHIBIT,
+            ColourPolicy::Inhibit,
             false,
         );
     }
 
     #[test]
     fn TEST_ROW_16_FORCE_COLOR_FALSE_UPPER() {
-        assert_row(16, &[("FORCE_COLOR", "FALSE")], false, COLOUR_POLICY_AUTO, false);
+        assert_row(16, &[("FORCE_COLOR", "FALSE")], false, ColourPolicy::Auto, false);
     }
 
     #[test]
     fn TEST_ROW_17_FORCE_COLOR_0() {
-        assert_row(17, &[("FORCE_COLOR", "0")], true, COLOUR_POLICY_AUTO, true);
+        assert_row(17, &[("FORCE_COLOR", "0")], true, ColourPolicy::Auto, true);
     }
 
     #[test]
     fn TEST_ROW_18_CLICOLOR_0() {
-        assert_row(18, &[("CLICOLOR", "0")], true, COLOUR_POLICY_INHIBIT, false);
+        assert_row(18, &[("CLICOLOR", "0")], true, ColourPolicy::Inhibit, false);
     }
 
     #[test]
     fn TEST_ROW_19_CLICOLOR_1() {
-        assert_row(19, &[("CLICOLOR", "1")], true, COLOUR_POLICY_AUTO, true);
+        assert_row(19, &[("CLICOLOR", "1")], true, ColourPolicy::Auto, true);
     }
 
     #[test]
@@ -612,14 +712,14 @@ mod tests {
             20,
             &[("NO_COLOR", "1"), ("WOAD_COLOUR", "")],
             true,
-            COLOUR_POLICY_INHIBIT,
+            ColourPolicy::Inhibit,
             false,
         );
     }
 
     #[test]
     fn TEST_ROW_21_EMPTY_NO_COLOR_IS_ABSENT() {
-        assert_row(21, &[("NO_COLOR", "")], true, COLOUR_POLICY_AUTO, true);
+        assert_row(21, &[("NO_COLOR", "")], true, ColourPolicy::Auto, true);
     }
 
     #[test]
@@ -629,14 +729,14 @@ mod tests {
             refresh();
 
             let attached = writer(true);
-            assert_eq!(colour_policy(), COLOUR_POLICY_FORCE, "row 22 before refresh");
+            assert_eq!(colour_policy(), ColourPolicy::Force, "row 22 before refresh");
             assert!(supports_colour(attached), "row 22 before refresh");
 
             unsafe { env::remove_var("WOAD_COLOUR") };
             assign("NO_COLOR", "1");
             refresh();
 
-            assert_eq!(colour_policy(), COLOUR_POLICY_INHIBIT, "row 22 after refresh");
+            assert_eq!(colour_policy(), ColourPolicy::Inhibit, "row 22 after refresh");
             assert!(!supports_colour(attached), "row 22 after refresh");
             assert_eq!(seq_for(crate::BOLD, attached), "");
             assert!(is_tty(attached), "row 22 attachment stays a terminal");

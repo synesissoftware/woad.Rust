@@ -100,7 +100,7 @@ woad = { version = "0.1.0-alpha1" }
 
 ## Environment
 
-`colour_policy()` returns `COLOUR_POLICY_AUTO` (0), `COLOUR_POLICY_FORCE` (1), or `COLOUR_POLICY_INHIBIT` (2). The result is cached until `refresh` is invoked.
+`colour_policy()` returns `ColourPolicy`: `Auto` (0), `Force` (1), or `Inhibit` (2). The result is cached until `refresh` is invoked.
 
 A variable that is unset or empty is absent. Values are not trimmed. The first present variable in this order wins:
 

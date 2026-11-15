@@ -15,9 +15,7 @@ pub use policy::{
     refresh,
     seq_for,
     supports_colour,
-    COLOUR_POLICY_AUTO,
-    COLOUR_POLICY_FORCE,
-    COLOUR_POLICY_INHIBIT,
+    ColourPolicy,
 };
 pub use sequences::{
     BG_BLACK,
