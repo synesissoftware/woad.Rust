@@ -21,10 +21,6 @@
 
 #[path = "version.rs"]
 mod crate_version;
-mod policy;
-mod sequences;
-pub mod version;
-
 pub use crate_version::{
     version,
     version_string,
@@ -34,6 +30,8 @@ pub use crate_version::{
     VERSION_PATCH,
     VERSION_RELSTATUS,
 };
+
+mod policy;
 pub use policy::{
     blinking_for,
     bold_for,
@@ -54,6 +52,8 @@ pub use policy::{
     fd_supports_colour,
     seq_for_fd,
 };
+
+mod sequences;
 pub use sequences::{
     BG_BLACK,
     BG_BLUE,
