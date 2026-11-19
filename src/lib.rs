@@ -3,8 +3,8 @@
 //! **woad** provides fixed SGR sequences, and stream-conditional sequences
 //! that emit only when the destination warrants colour. The decision is the
 //! portable half of the **woad** 0.3.0 colour contract: cached environment
-//! inspection, `TERM=dumb`, and [`std::io::IsTerminal`]. It is not a console
-//! or TUI framework.
+//! inspection, `TERM=dumb`, and [`std::io::IsTerminal`]. It is not a
+//! console or TUI framework.
 //!
 //! Windows console-mode changes, virtual-terminal gating, and handle
 //! currencies are not part of this alpha. [`console_supports_ansi`] is
