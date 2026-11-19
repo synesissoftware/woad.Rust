@@ -1,22 +1,59 @@
 //! Minimal ANSI terminal colour codes, for Rust.
 //!
-//! **woad** provides the smallest useful set of fixed SGR sequences for
-//! library authors, and the portable half of the colour policy: cached
-//! environment inspection, `TERM=dumb`, and conditional emission for a
-//! writer that implements [`std::io::IsTerminal`]. It is not a console or
-//! TUI framework. Windows virtual-terminal gating is a later alpha.
+//! **woad** provides fixed SGR sequences, and stream-conditional sequences
+//! that emit only when the destination warrants colour. The decision is the
+//! portable half of the **woad** 0.3.0 colour contract: cached environment
+//! inspection, `TERM=dumb`, and [`std::io::IsTerminal`]. It is not a
+//! console or TUI framework.
+//!
+//! Windows console-mode changes, virtual-terminal gating, and handle
+//! currencies are not part of this alpha. [`console_supports_ansi`] is
+//! always `true`, which is the non-Windows answer. On Windows a terminal is
+//! treated with the Unix rule.
+//!
+//! ```
+//! use woad::{reset_for, seq_for, FG_GREEN};
+//!
+//! let stdout = std::io::stdout();
+//!
+//! println!("{}ok{}", seq_for(FG_GREEN, &stdout), reset_for(&stdout),);
+//! ```
+
+#[path = "version.rs"]
+mod crate_version;
+pub use crate_version::{
+    version,
+    version_string,
+    VERSION,
+    VERSION_MAJOR,
+    VERSION_MINOR,
+    VERSION_PATCH,
+    VERSION_RELSTATUS,
+};
 
 mod policy;
-mod sequences;
-
 pub use policy::{
+    blinking_for,
+    bold_for,
     colour_policy,
+    console_supports_ansi,
     is_tty,
     refresh,
+    reset_for,
     seq_for,
+    seq_for_absent,
     supports_colour,
+    supports_colour_absent,
     ColourPolicy,
 };
+#[cfg(unix)]
+pub use policy::{
+    fd_is_tty,
+    fd_supports_colour,
+    seq_for_fd,
+};
+
+mod sequences;
 pub use sequences::{
     BG_BLACK,
     BG_BLUE,
@@ -56,51 +93,42 @@ pub use sequences::{
 };
 
 
-/// Crate version.
-pub const VERSION : &str = "0.1.0-alpha1";
-
-
 #[cfg(test)]
 mod tests {
     #![allow(non_snake_case)]
 
 
     #[test]
-    fn TEST_VERSION() {
-        assert_eq!(crate::VERSION, "0.1.0-alpha1");
-    }
-
-    #[test]
     fn TEST_RESET() {
-        assert_eq!(crate::RESET, "\x1b[0m");
+        assert_eq!("\x1b[0m", crate::RESET);
     }
 
     #[test]
     fn TEST_BOLD() {
-        assert_eq!(crate::BOLD, "\x1b[1m");
+        assert_eq!("\x1b[1m", crate::BOLD);
     }
 
     #[test]
     fn TEST_BLINKING() {
-        assert_eq!(crate::BLINKING, "\x1b[5m");
+        assert_eq!("\x1b[5m", crate::BLINKING);
     }
 
     #[test]
     fn TEST_FG_RED() {
-        assert_eq!(crate::FG_RED, "\x1b[31m");
+        assert_eq!("\x1b[31m", crate::FG_RED);
     }
 
     #[test]
     fn TEST_BG_BLUE() {
-        assert_eq!(crate::BG_BLUE, "\x1b[44m");
+        assert_eq!("\x1b[44m", crate::BG_BLUE);
     }
 
     #[test]
     fn TEST_CODES_ARE_CSI_SGR() {
         let codes = [
-            crate::RESET,
-            crate::BOLD,
             crate::BLINKING,
+            crate::BOLD,
+            crate::RESET,
             crate::FG_BLACK,
             crate::FG_BRIGHT_WHITE,
             crate::BG_BLACK,

@@ -1,10 +1,11 @@
 # woad.Rust - Examples <!-- omit in toc -->
 
 
-| Name     | Source                                                   | Summary                                             |
-| -------- | -------------------------------------------------------- | --------------------------------------------------- |
-| colour   | [examples/colour/main.rs](./examples/colour/main.rs)     | Prints a sequence only when stdout supports colour  |
-| versions | [examples/versions/main.rs](./examples/versions/main.rs) | Prints the crate name and version                   |
+| Name           | Source                                                       | Summary                                             |
+| -------------- | ------------------------------------------------------------ | --------------------------------------------------- |
+| **colour**     | [examples/colour/main.rs](./examples/colour/main.rs)         | Prints a sequence only when stdout supports colour  |
+| **colour_for** | [examples/colour_for/main.rs](./examples/colour_for/main.rs) | Emits colour only when the destination warrants it  |
+| **versions**   | [examples/versions/main.rs](./examples/versions/main.rs)     | Prints `version_string()` and packed `version()`    |
 
 
 <!-- ########################### end of file ########################### -->

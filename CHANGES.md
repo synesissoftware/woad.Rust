@@ -1,6 +1,18 @@
 # woad.Rust - Changes <!-- omit in toc -->
 
 
+## 0.1.0-alpha2 - 19th November 2026
+
+* Added attribute helpers `blinking_for`, `bold_for`, and `reset_for`;
+* Added Unix descriptor forms `fd_is_tty`, `fd_supports_colour`, and `seq_for_fd`;
+* Added `ColourPolicy::as_str` and `Display` (`auto`, `force`, `inhibit`);
+* Added null-stream forms `supports_colour_absent` and `seq_for_absent`;
+* Added `console_supports_ansi()`, which reports `true` in this alpha;
+* Added packed `version()` and `version_string()` in the **woad** `WOAD_VER` layout (`0x00010042`; relstatus `0x42` is alpha 2), with `VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_PATCH`, and `VERSION_RELSTATUS`, in **src/version.rs**;
+* Added **examples/colour_for/main.rs**, covering stdout, stderr, the attribute helpers, and, on Unix, the descriptor form;
+* **examples/versions/main.rs** prints `version_string()` and packed `version()` with colour;
+
+
 ## 0.1.0-alpha1 - 16th November 2026
 
 * Added `BOLD` and `BLINKING` SGR sequences;

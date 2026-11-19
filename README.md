@@ -16,8 +16,12 @@ Minimal ANSI terminal colour codes, for Rust
 - [Developer Experience](#developer-experience)
 - [Installation](#installation)
 - [Components](#components)
+  - [Fixed sequences](#fixed-sequences)
 - [Environment](#environment)
 - [Examples](#examples)
+  - [Stream-conditional sequences](#stream-conditional-sequences)
+  - [Colour policy](#colour-policy)
+  - [Version](#version)
 - [Project Information](#project-information)
   - [Where to get help](#where-to-get-help)
   - [Contribution guidelines](#contribution-guidelines)
@@ -32,11 +36,11 @@ Minimal ANSI terminal colour codes, for Rust
 
 ## Introduction
 
-**woad** provides the smallest useful set of fixed ANSI SGR colour sequences for library authors. It is not a console or TUI framework.
+**woad** provides fixed ANSI SGR sequences, and stream-conditional counterparts that emit only when the destination warrants colour. It is not a console or TUI framework.
 
-**woad.Rust** is the **Rust** implementation. The declared MSRV is **1.74**.
+**woad.Rust** is the **Rust** implementation. The declared MSRV is **1.74**. It has **no dependencies** on any other crate.
 
-It has **no dependencies** on any other crate.
+This alpha matches the portable colour contract of **woad** 0.3.0. Console-mode changes, Windows virtual-terminal gating, handle currencies, and mintty PTY recognition are not included. [`console_supports_ansi`](./src/lib.rs) is always `true`.
 
 
 ## Developer Experience
@@ -46,6 +50,7 @@ It has **no dependencies** on any other crate.
 ```bash
 cargo test --all-targets
 cargo run --example colour
+cargo run --example colour_for
 ```
 
 The smallest useful call emits a sequence only when the writer supports colour:
@@ -60,9 +65,9 @@ fn main() {
 }
 ```
 
-That is [examples/colour/main.rs](./examples/colour/main.rs). Fixed sequences (`BOLD`, `BLINKING`, `FG_*`, `BG_*`) always contain the SGR bytes. `colour_policy`, `supports_colour`, and `seq_for` apply the cached environment policy. `is_tty` reports attachment only. `refresh` drops that cache.
+That is [examples/colour/main.rs](./examples/colour/main.rs). [examples/colour_for/main.rs](./examples/colour_for/main.rs) prints stdout and stderr, including bold, blinking, and, on Unix, the descriptor form. Fixed sequences (`BOLD`, `BLINKING`, `FG_*`, `BG_*`) always contain the SGR bytes. `colour_policy`, `supports_colour`, and `seq_for` apply the cached environment policy. `is_tty` reports attachment only. `refresh` drops that cache.
 
-The example prints green `ok` only when stdout supports colour. A pipe is not a terminal, so automatic policy drops the sequences. `WOAD_COLOUR` and `NO_COLOR` override that. The accepted forms are listed under [Environment](#environment).
+The `colour` example prints green `ok` only when stdout supports colour. A pipe is not a terminal, so automatic policy drops the sequences. `WOAD_COLOUR` and `NO_COLOR` override that. The accepted forms are listed under [Environment](#environment).
 
 ```bash
 # Automatic policy, attached to a terminal: green "ok" when TERM is not dumb.
@@ -89,13 +94,18 @@ TERM=dumb cargo run --example colour
 Reference in **Cargo.toml** in the usual way:
 
 ```toml
-woad = { version = "0.1.0-alpha1" }
+woad = { version = "0.1.0-alpha2" }
 ```
 
 
 ## Components
 
-**woad.Rust** ships fixed SGR sequences (`BLINKING`, `BOLD`, `RESET`, `FG_*`, `BG_*`, including bright variants), `VERSION`, and the portable colour policy: `colour_policy`, `refresh`, `is_tty`, `supports_colour`, and `seq_for`. On Unix a terminal supports colour when the policy is automatic and `TERM` is not `dumb`. Windows virtual-terminal mode and mintty PTY recognition are not implemented.
+**woad.Rust** ships fixed SGR sequences (`BLINKING`, `BOLD`, `RESET`, `FG_*`, `BG_*`, including bright variants), `VERSION`, packed `version()` / `version_string()`, and the portable colour policy: `colour_policy`, `refresh`, `is_tty`, `supports_colour`, and `seq_for`. Attribute helpers (`blinking_for`, `bold_for`, `reset_for`) and the Unix descriptor forms sit beside those. On Unix a terminal supports colour when the policy is automatic and `TERM` is not `dumb`. Windows virtual-terminal mode, handle currencies, and mintty PTY recognition are not implemented.
+
+
+### Fixed sequences
+
+String constants: `RESET`, `BOLD`, `BLINKING`, `FG_*`, and `BG_*`, the colours each in normal and `BRIGHT` variants. They always emit.
 
 
 ## Environment
@@ -119,6 +129,45 @@ On Unix, auto plus a terminal plus a `TERM` that is not `dumb` means colour. The
 ## Examples
 
 Examples are provided in the **examples** directory. A catalogue is in [EXAMPLES.md](./EXAMPLES.md).
+
+
+### Stream-conditional sequences
+
+`seq_for` yields the sequence when the destination warrants colour, and `""` when it does not. `blinking_for`, `bold_for`, and `reset_for` are the attribute forms. The destination is any [`std::io::IsTerminal`](https://doc.rust-lang.org/std/io/trait.IsTerminal.html) value (`Stdout`, `Stderr`, `Stdin`, `File`, and on Unix a borrowed file descriptor).
+
+```rust
+let stdout = std::io::stdout();
+
+println!(
+    "{}ok{}",
+    woad::seq_for(woad::FG_GREEN, &stdout),
+    woad::reset_for(&stdout),
+);
+```
+
+On Unix, `fd_is_tty`, `fd_supports_colour`, and `seq_for_fd` take [`AsFd`](https://doc.rust-lang.org/std/os/fd/trait.AsFd.html). A missing destination is `supports_colour_absent` / `seq_for_absent` (the C null-stream case: the policy alone).
+
+
+### Colour policy
+
+The environment is read once, on first need, until `refresh()`:
+
+| Variable | Value | Effect |
+| --- | --- | --- |
+| `WOAD_COLOUR`, or `WOAD_COLOR` | `1`, `always`, `force`, `on`, `true`, `yes` | Force colour |
+| `WOAD_COLOUR`, or `WOAD_COLOR` | `0`, `false`, `never`, `no`, `none`, `off` | Inhibit colour |
+| `WOAD_COLOUR`, or `WOAD_COLOR` | `auto`, or anything unrecognised | Defer to the destination |
+| `NO_COLOR` | set and non-empty | Inhibit colour |
+| `CLICOLOR_FORCE` | set, non-empty, and not `0` | Force colour |
+| `FORCE_COLOR` | set, non-empty, and not `0` or `false` | Force colour |
+| `CLICOLOR` | `0` | Inhibit colour |
+
+`WOAD_COLOUR` / `WOAD_COLOR` are case-insensitive. In the deferring case, a `TERM` of `dumb` also suppresses colour. `console_supports_ansi()` is always `true` in this alpha.
+
+
+### Version
+
+`VERSION` and `version_string()` are the SemVer string, including the prerelease label (`0.1.0-alpha2`). `version()` is the packed **woad** `WOAD_VER` (`0x00010042`; low byte `0x42` is alpha 2).
 
 
 ## Project Information

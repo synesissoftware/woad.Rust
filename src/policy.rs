@@ -3,6 +3,14 @@
 //! Cached environment inspection for the Unix half of the **woad** 0.3.0
 //! colour contract. Windows virtual-terminal gating is not in this alpha.
 
+use crate::{
+    BLINKING,
+    BOLD,
+    RESET,
+};
+
+#[cfg(unix)]
+use std::os::fd::AsFd;
 use std::{
     cell::{
         self as std_cell,
@@ -13,6 +21,7 @@ use std::{
         OsStr,
         OsString,
     },
+    fmt as std_fmt,
     io::IsTerminal,
     sync::{
         Mutex,
@@ -43,6 +52,26 @@ pub enum ColourPolicy {
     Inhibit = 2,
 }
 
+impl ColourPolicy {
+    /// Stable policy name: `auto`, `force`, or `inhibit`.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Force => "force",
+            Self::Inhibit => "inhibit",
+        }
+    }
+}
+
+impl std_fmt::Display for ColourPolicy {
+    fn fmt(
+        &self,
+        f : &mut std_fmt::Formatter<'_>,
+    ) -> std_fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 
 /* /////////////////////////////////////////////////////////////////////////
  * constants
@@ -68,8 +97,8 @@ struct Environment {
 struct Cache(std_cell::UnsafeCell<Environment>);
 
 // SAFETY: every access goes through `with_environment`, which holds
-// `CACHE_GATE`. Re-entry is same-thread only, so the mutable borrow does not
-// alias another thread.
+// `CACHE_GATE`. Re-entry is same-thread only, so the mutable borrow does
+// not alias another thread.
 unsafe impl Sync for Cache {
 }
 
@@ -232,6 +261,15 @@ fn supports_for(
 }
 
 
+/// Colour decision for an attachment flag, with no writer.
+///
+/// `false` is the null-stream case: force is the only policy that yields
+/// colour.
+fn supports_when_attached(is_terminal : bool) -> bool {
+    with_environment(|env| supports_for(env, is_terminal))
+}
+
+
 /// Whether `TERM` equals `dumb`, ignoring ASCII case.
 ///
 /// An absent or empty `TERM` is not dumb.
@@ -283,9 +321,9 @@ fn with_environment<R>(body : impl FnOnce(&mut Environment) -> R) -> R {
 
         let _reset = ClearCacheHeld;
 
-        // SAFETY: `CACHE_GATE` is held, and `CACHE_HELD` blocks other entries on
-        // this thread from taking a second guard. Other threads wait
-        // on `CACHE_GATE`.
+        // SAFETY: `CACHE_GATE` is held, and `CACHE_HELD` blocks other
+        // entries on this thread from taking a second guard. Other threads
+        // wait on `CACHE_GATE`.
         //
         // Now we may invoke safely the `body` function.
         body(unsafe { &mut *CACHE.0.get() })
@@ -296,6 +334,20 @@ fn with_environment<R>(body : impl FnOnce(&mut Environment) -> R) -> R {
 /* /////////////////////////////////////////////////////////////////////////
  * API functions
  */
+
+/// Obtains [`BLINKING`] when [`supports_colour`] is true for `target`;
+/// otherwise `""`.
+pub fn blinking_for(target : &impl IsTerminal) -> &'static str {
+    seq_for(BLINKING, target)
+}
+
+
+/// Obtains [`BOLD`] when [`supports_colour`] is true for `target`;
+/// otherwise `""`.
+pub fn bold_for(target : &impl IsTerminal) -> &'static str {
+    seq_for(BOLD, target)
+}
+
 
 /// Prevailing colour policy, cached until [`refresh`].
 ///
@@ -327,6 +379,33 @@ pub fn colour_policy() -> ColourPolicy {
 }
 
 
+/// Whether ANSI SGR sequences are known to be interpreted.
+///
+/// Off Windows, **woad** always reports that they are. Virtual-terminal
+/// detection and `WOAD_SET_CONSOLE_MODE` are not implemented in this alpha,
+/// so this function does not consult the environment at this time.
+pub fn console_supports_ansi() -> bool {
+    true
+}
+
+
+/// Whether `fd` is attached to a terminal.
+///
+/// Unix file-descriptor currency. Windows handle currencies are not
+/// implemented.
+#[cfg(unix)]
+pub fn fd_is_tty(fd : impl AsFd) -> bool {
+    is_tty(&fd.as_fd())
+}
+
+
+/// Whether colour should be emitted for `fd`.
+#[cfg(unix)]
+pub fn fd_supports_colour(fd : impl AsFd) -> bool {
+    supports_colour(&fd.as_fd())
+}
+
+
 /// Whether `writer` is attached to a terminal.
 ///
 /// This is the host check only. It does not apply the colour policy.
@@ -349,9 +428,17 @@ pub fn refresh() {
 }
 
 
-/// `seq` when [`supports_colour`] is true for `writer`, otherwise `""`.
+/// Obtains [`RESET`] when [`supports_colour`] is true for `target`;
+/// otherwise `""`.
+pub fn reset_for(target : &impl IsTerminal) -> &'static str {
+    seq_for(RESET, target)
+}
+
+
+/// Obtains `seq` when [`supports_colour`] is true for `writer`; otherwise
+/// `""`.
 ///
-/// An empty `seq` yields `""`.
+/// An empty `seq` obtains `""` regardless of [`supports_colour`].
 pub fn seq_for<'seq, W>(
     seq : &'seq str,
     writer : &W,
@@ -367,12 +454,32 @@ where
 }
 
 
+/// Yields `seq` from the policy alone, as for a null stream.
+pub fn seq_for_absent(seq : &str) -> &str {
+    if seq.is_empty() || !supports_colour_absent() {
+        ""
+    } else {
+        seq
+    }
+}
+
+
+/// Descriptor equivalent of [`seq_for`].
+#[cfg(unix)]
+pub fn seq_for_fd(
+    seq : &str,
+    fd : impl AsFd,
+) -> &str {
+    seq_for(seq, &fd.as_fd())
+}
+
+
 /// Whether colour should be emitted for `writer`.
 ///
-/// [`ColourPolicy::Force`] is yes for every writer.
-/// [`ColourPolicy::Inhibit`] is no for every writer.
-/// [`ColourPolicy::Auto`] is yes only when `writer` is a terminal and
-/// `TERM` is not `dumb` (any capitalisation).
+/// - [`ColourPolicy::Force`] is yes for every writer;
+/// - [`ColourPolicy::Inhibit`] is no for every writer;
+/// - [`ColourPolicy::Auto`] is yes only when `writer` is a terminal and
+///   `TERM` is not `dumb` (any capitalisation);
 ///
 /// On Unix a terminal is ANSI-capable. Windows virtual-terminal gating and
 /// mintty recognition are not implemented in this alpha; a Windows terminal
@@ -381,9 +488,16 @@ pub fn supports_colour<W>(writer : &W) -> bool
 where
     W : IsTerminal + ?Sized,
 {
-    let is_terminal = writer.is_terminal();
+    supports_when_attached(writer.is_terminal())
+}
 
-    with_environment(|env| supports_for(env, is_terminal))
+
+/// Whether colour should be emitted when no destination is available.
+///
+/// This is the null-stream case: the policy alone, with no terminal
+/// attachment. Force is the only policy that yields `true`.
+pub fn supports_colour_absent() -> bool {
+    supports_when_attached(false)
 }
 
 
