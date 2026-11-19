@@ -12,7 +12,9 @@
 
 * [x] ~~~SGR colour and reset codes~~~ - ✅;
 * [x] ~~~TTY-conditional colour codes (process and per-stream)~~~ - ✅;
-* [ ] Windows virtual-terminal gating (OS build + `GetConsoleMode`) and handle currencies;
+* [x] ~~~portable colour policy (`colour_policy`, `refresh`, `supports_colour`, `seq_for`), including `BOLD` and `BLINKING`~~~ - ✅;
+* [ ] Windows virtual-terminal gating (OS build + `GetConsoleMode` + `WOAD_SET_CONSOLE_MODE`) and handle currencies;
+* [ ] mintty / MSYS2 / Cygwin PTY recognition;
 
 
 ## Performance improvements

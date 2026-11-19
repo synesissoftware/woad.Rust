@@ -47,6 +47,10 @@ name = "woad"
 path = "src/lib.rs"
 
 [[example]]
+name = "colour"
+path = "examples/colour/main.rs"
+
+[[example]]
 name = "colour_for"
 path = "examples/colour_for/main.rs"
 
