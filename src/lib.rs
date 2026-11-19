@@ -19,13 +19,21 @@
 //! println!("{}ok{}", seq_for(FG_GREEN, &stdout), reset_for(&stdout),);
 //! ```
 
-mod policy;
-mod sequences;
-
 #[path = "version.rs"]
 mod crate_version;
+mod policy;
+mod sequences;
 pub mod version;
 
+pub use crate_version::{
+    version,
+    version_string,
+    VERSION,
+    VERSION_MAJOR,
+    VERSION_MINOR,
+    VERSION_PATCH,
+    VERSION_RELSTATUS,
+};
 pub use policy::{
     blinking_for,
     bold_for,
@@ -39,6 +47,12 @@ pub use policy::{
     supports_colour,
     supports_colour_absent,
     ColourPolicy,
+};
+#[cfg(unix)]
+pub use policy::{
+    fd_is_tty,
+    fd_supports_colour,
+    seq_for_fd,
 };
 pub use sequences::{
     BG_BLACK,
@@ -76,22 +90,6 @@ pub use sequences::{
     FG_WHITE,
     FG_YELLOW,
     RESET,
-};
-
-pub use crate_version::{
-    version,
-    version_string,
-    VERSION,
-    VERSION_MAJOR,
-    VERSION_MINOR,
-    VERSION_PATCH,
-    VERSION_RELSTATUS,
-};
-#[cfg(unix)]
-pub use policy::{
-    fd_is_tty,
-    fd_supports_colour,
-    seq_for_fd,
 };
 
 

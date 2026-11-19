@@ -54,7 +54,6 @@ fn main() {
     {
         use std::os::fd::AsFd as _;
 
-
         println!(
             "{}this line is cyan if, and only if, stdout's descriptor warrants colour{}",
             woad::seq_for_fd(woad::FG_CYAN, stdout.as_fd()),
