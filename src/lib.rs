@@ -19,7 +19,6 @@
 //! println!("{}ok{}", seq_for(FG_GREEN, &stdout), reset_for(&stdout),);
 //! ```
 
-mod dynamic;
 mod policy;
 mod sequences;
 
@@ -27,20 +26,18 @@ mod sequences;
 mod crate_version;
 pub mod version;
 
-pub use dynamic::{
+pub use policy::{
     blinking_for,
     bold_for,
-    console_supports_ansi,
-    reset_for,
-    seq_for_absent,
-    supports_colour_absent,
-};
-pub use policy::{
     colour_policy,
+    console_supports_ansi,
     is_tty,
     refresh,
+    reset_for,
     seq_for,
+    seq_for_absent,
     supports_colour,
+    supports_colour_absent,
     ColourPolicy,
 };
 pub use sequences::{
@@ -81,20 +78,20 @@ pub use sequences::{
     RESET,
 };
 
-#[cfg(unix)]
-pub use dynamic::{
-    fd_is_tty,
-    fd_supports_colour,
-    seq_for_fd,
-};
 pub use crate_version::{
+    version,
+    version_string,
     VERSION,
     VERSION_MAJOR,
     VERSION_MINOR,
     VERSION_PATCH,
     VERSION_RELSTATUS,
-    version,
-    version_string,
+};
+#[cfg(unix)]
+pub use policy::{
+    fd_is_tty,
+    fd_supports_colour,
+    seq_for_fd,
 };
 
 
