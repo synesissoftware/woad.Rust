@@ -15,8 +15,8 @@ fn main() {
     println!(
         "policy: {}; stdout is{} a tty; stderr is{} a tty",
         woad::colour_policy(),
-        if woad::stream_is_tty(&stdout) { "" } else { " not" },
-        if woad::stream_is_tty(&stderr) { "" } else { " not" },
+        if woad::is_tty(&stdout) { "" } else { " not" },
+        if woad::is_tty(&stderr) { "" } else { " not" },
     );
 
     println!(
@@ -39,14 +39,14 @@ fn main() {
 
     eprintln!(
         "{}{}this line is white-on-red if, and only if, stderr warrants colour{}",
-        woad::bg_for(woad::BG_RED, &stderr),
-        woad::fg_for(woad::FG_BRIGHT_WHITE, &stderr),
+        woad::seq_for(woad::BG_RED, &stderr),
+        woad::seq_for(woad::FG_BRIGHT_WHITE, &stderr),
         woad::reset_for(&stderr),
     );
 
     println!(
         "{}this line is yellow if, and only if, stdout warrants colour{}",
-        woad::fg_for(woad::FG_YELLOW, &stdout),
+        woad::seq_for(woad::FG_YELLOW, &stdout),
         woad::reset_for(&stdout),
     );
 

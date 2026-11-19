@@ -1,6 +1,13 @@
 # woad.Rust - Changes <!-- omit in toc -->
 
 
+## 0.1.0-alpha2 - 19th November 2026
+
+* Removed `fg_for`, `bg_for`, `stream_is_tty`, `stream_supports_colour`, and `seq_for_stream`; callers use `seq_for`, `is_tty`, and `supports_colour`;
+* Kept `reset_for`, `bold_for`, and `blinking_for`;
+* Reported `0.1.0-alpha2`, packed **woad** `WOAD_VER` relstatus `0x42`;
+
+
 ## 0.1.0-alpha1 - 16th November 2026
 
 * Added `BOLD` and `BLINKING` SGR sequences, kept in private **src/sequences.rs** and re-exported at the crate root;

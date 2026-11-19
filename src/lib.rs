@@ -24,16 +24,11 @@ mod policy;
 mod sequences;
 
 pub use dynamic::{
-    bg_for,
     blinking_for,
     bold_for,
     console_supports_ansi,
-    fg_for,
     reset_for,
     seq_for_absent,
-    seq_for_stream,
-    stream_is_tty,
-    stream_supports_colour,
     supports_colour_absent,
 };
 pub use policy::{
@@ -101,18 +96,18 @@ pub const VERSION_PATCH : u32 = 0;
 
 /// Release-status byte of [`version`].
 ///
-/// `0x41` is alpha 1. `0xFF` is a numbered release. The layout matches
+/// `0x42` is alpha 2. `0xFF` is a numbered release. The layout matches
 /// **woad** `WOAD_VER`: bits 24-31 major, 16-23 minor, 8-15 patch, and
 /// 0-7 release status.
-pub const VERSION_RELSTATUS : u32 = 0x41;
+pub const VERSION_RELSTATUS : u32 = 0x42;
 
 /// Crate version, SemVer, including the prerelease label.
-pub const VERSION : &str = "0.1.0-alpha1";
+pub const VERSION : &str = "0.1.0-alpha2";
 
 /// Packed **woad** version, in the `WOAD_VER` layout.
 ///
 /// ```
-/// assert_eq!(0x0001_0041, woad::version());
+/// assert_eq!(0x0001_0042, woad::version());
 /// assert_eq!(woad::VERSION, woad::version_string());
 /// ```
 pub const fn version() -> u32 {
@@ -135,7 +130,7 @@ mod tests {
 
     #[test]
     fn TEST_VERSION() {
-        assert_eq!("0.1.0-alpha1", crate::VERSION);
+        assert_eq!("0.1.0-alpha2", crate::VERSION);
         assert_eq!(crate::VERSION, crate::version_string());
         assert_eq!(crate::VERSION, env!("CARGO_PKG_VERSION"));
     }
@@ -145,8 +140,8 @@ mod tests {
         assert_eq!(0, crate::VERSION_MAJOR);
         assert_eq!(1, crate::VERSION_MINOR);
         assert_eq!(0, crate::VERSION_PATCH);
-        assert_eq!(0x41, crate::VERSION_RELSTATUS);
-        assert_eq!(0x0001_0041, crate::version());
+        assert_eq!(0x42, crate::VERSION_RELSTATUS);
+        assert_eq!(0x0001_0042, crate::version());
     }
 
     #[test]

@@ -1,8 +1,8 @@
 //! Extra destination currencies from the earlier alpha.
 //!
 //! Policy and `seq_for` live in [`crate::policy`]. These names are the
-//! stream, descriptor, and absent-destination forms, plus the attribute
-//! helpers. Windows handle currencies are not implemented.
+//! descriptor and absent-destination forms, plus `reset_for`, `bold_for`,
+//! and `blinking_for`. Windows handle currencies are not implemented.
 
 #[cfg(unix)]
 use std::os::fd::AsFd;
@@ -27,25 +27,13 @@ pub fn console_supports_ansi() -> bool {
     true
 }
 
-/// Whether `target` is attached to a terminal.
-///
-/// This is [`std::io::IsTerminal`] and does not apply the colour policy.
-pub fn stream_is_tty(target : &impl IsTerminal) -> bool {
-    target.is_terminal()
-}
-
 /// Whether `fd` is attached to a terminal.
 ///
 /// Unix file-descriptor currency. Windows handle currencies are not
 /// implemented.
 #[cfg(unix)]
 pub fn fd_is_tty(fd : impl AsFd) -> bool {
-    stream_is_tty(&fd.as_fd())
-}
-
-/// Whether colour should be emitted for `target`.
-pub fn stream_supports_colour(target : &impl IsTerminal) -> bool {
-    supports_colour(target)
+    crate::is_tty(&fd.as_fd())
 }
 
 /// Whether colour should be emitted for `fd`.
@@ -62,15 +50,7 @@ pub fn supports_colour_absent() -> bool {
     policy::supports_when_attached(false)
 }
 
-/// Yields `seq` when `target` warrants colour, and `""` otherwise.
-pub fn seq_for_stream<'seq>(
-    seq : &'seq str,
-    target : &impl IsTerminal,
-) -> &'seq str {
-    seq_for(seq, target)
-}
-
-/// Descriptor equivalent of [`seq_for_stream`].
+/// Descriptor equivalent of [`seq_for`].
 #[cfg(unix)]
 pub fn seq_for_fd(
     seq : &str,
@@ -86,22 +66,6 @@ pub fn seq_for_absent(seq : &str) -> &str {
     } else {
         seq
     }
-}
-
-/// Foreground-intent synonym of [`seq_for`].
-pub fn fg_for<'seq>(
-    seq : &'seq str,
-    target : &impl IsTerminal,
-) -> &'seq str {
-    seq_for(seq, target)
-}
-
-/// Background-intent synonym of [`seq_for`].
-pub fn bg_for<'seq>(
-    seq : &'seq str,
-    target : &impl IsTerminal,
-) -> &'seq str {
-    seq_for(seq, target)
 }
 
 /// Yields [`RESET`] for `target`, or `""`.

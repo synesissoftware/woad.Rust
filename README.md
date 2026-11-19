@@ -94,13 +94,13 @@ TERM=dumb cargo run --example colour
 Reference in **Cargo.toml** in the usual way:
 
 ```toml
-woad = { version = "0.1.0-alpha1" }
+woad = { version = "0.1.0-alpha2" }
 ```
 
 
 ## Components
 
-**woad.Rust** ships fixed SGR sequences (`BLINKING`, `BOLD`, `RESET`, `FG_*`, `BG_*`, including bright variants), `VERSION`, packed `version()` / `version_string()`, and the portable colour policy: `colour_policy`, `refresh`, `is_tty`, `supports_colour`, and `seq_for`. Attribute helpers (`bold_for`, `blinking_for`, `reset_for`, `fg_for`, `bg_for`) and the Unix descriptor forms sit beside those. On Unix a terminal supports colour when the policy is automatic and `TERM` is not `dumb`. Windows virtual-terminal mode, handle currencies, and mintty PTY recognition are not implemented.
+**woad.Rust** ships fixed SGR sequences (`BLINKING`, `BOLD`, `RESET`, `FG_*`, `BG_*`, including bright variants), `VERSION`, packed `version()` / `version_string()`, and the portable colour policy: `colour_policy`, `refresh`, `is_tty`, `supports_colour`, and `seq_for`. Attribute helpers (`blinking_for`, `bold_for`, `reset_for`) and the Unix descriptor forms sit beside those. On Unix a terminal supports colour when the policy is automatic and `TERM` is not `dumb`. Windows virtual-terminal mode, handle currencies, and mintty PTY recognition are not implemented.
 
 
 ### Fixed sequences
@@ -133,7 +133,7 @@ Examples are provided in the **examples** directory. A catalogue is in [EXAMPLES
 
 ### Stream-conditional sequences
 
-`seq_for`, `fg_for`, and `bg_for` yield the sequence when the destination warrants colour, and `""` when it does not. `reset_for`, `bold_for`, and `blinking_for` are the attribute forms. The destination is any [`std::io::IsTerminal`](https://doc.rust-lang.org/std/io/trait.IsTerminal.html) value (`Stdout`, `Stderr`, `Stdin`, `File`, and on Unix a borrowed file descriptor).
+`seq_for` yields the sequence when the destination warrants colour, and `""` when it does not. `blinking_for`, `bold_for`, and `reset_for` are the attribute forms. The destination is any [`std::io::IsTerminal`](https://doc.rust-lang.org/std/io/trait.IsTerminal.html) value (`Stdout`, `Stderr`, `Stdin`, `File`, and on Unix a borrowed file descriptor).
 
 ```rust
 let stdout = std::io::stdout();
@@ -167,7 +167,7 @@ The environment is read once, on first need, until `refresh()`:
 
 ### Version
 
-`VERSION` and `version_string()` are the SemVer string, including the prerelease label (`0.1.0-alpha1`). `version()` is the packed **woad** `WOAD_VER` (`0x00010041`; low byte `0x41` is alpha 1).
+`VERSION` and `version_string()` are the SemVer string, including the prerelease label (`0.1.0-alpha2`). `version()` is the packed **woad** `WOAD_VER` (`0x00010042`; low byte `0x42` is alpha 2).
 
 
 ## Project Information
