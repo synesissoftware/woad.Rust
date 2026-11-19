@@ -29,7 +29,6 @@ keywords = [
 	"no-color",
 	"sgr",
 	"terminal",
-	"tty",
 ]
 license = "BSD-3-Clause"
 name = "woad"
