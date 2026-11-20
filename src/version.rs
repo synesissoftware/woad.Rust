@@ -17,7 +17,7 @@ pub const VERSION_PATCH : u32 = 0;
 pub const VERSION_RELSTATUS : u32 = 0x42;
 
 /// Crate version, SemVer, including the prerelease label.
-pub const VERSION : &str = "0.1.0-alpha2";
+pub const VERSION : &str = "0.1.0";
 
 /// Packed **woad** version, in the `WOAD_VER` layout.
 ///
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn TEST_VERSION() {
-        assert_eq!("0.1.0-alpha2", crate::VERSION);
+        assert_eq!("0.1.0", crate::VERSION);
         assert_eq!(crate::VERSION, crate::version_string());
         assert_eq!(crate::VERSION, env!("CARGO_PKG_VERSION"));
     }

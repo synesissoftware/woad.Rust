@@ -1,6 +1,11 @@
 # woad.Rust - Changes <!-- omit in toc -->
 
 
+## 0.1.0 - 20th November 2026
+
+* 0.1.0;
+
+
 ## 0.1.0-alpha2 - 19th November 2026
 
 * Added attribute helpers `blinking_for`, `bold_for`, and `reset_for`;
